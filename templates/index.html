@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demonstração de Pesquisas (N=10000)</title>
+    <style>
+        /* Estilos simples para ser rápido e prático */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f0f2f5; color: #333; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { color: #0056b3; text-align: center; border-bottom: 2px solid #0056b3; padding-bottom: 10px; }
+        p { text-align: center; }
+        .input-group { margin: 20px 0; display: flex; gap: 10px; }
+        .input-group input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+        .input-group button { padding: 12px 25px; background-color: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        .input-group button:hover { background-color: #1e7e34; }
+        table { width: 100%; border-collapse: collapse; margin-top: 25px; }
+        th, td { border: 1px solid #ddd; padding: 15px; text-align: left; }
+        th { background-color: #e9ecef; color: #555; }
+        .found { color: #28a745; font-weight: bold; }
+        .not-found { color: #dc3545; font-weight: bold; }
+        .loading { text-align: center; color: #007bff; font-weight: bold; margin-top: 20px; }
+        .detalhes { background-color: #f8f9fa; border: 1px dashed #ced4da; padding: 15px; margin-top: 20px; border-radius: 6px; overflow-x: auto;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔎 Comparação de Algoritmos de Pesquisa</h1>
+        <p>Tabela populada com **10.000 registros** (IDs de **1 a 10000**).</p>
+        
+        <div class="input-group">
+            <input type="text" id="chaveBusca" placeholder="Digite o ID para pesquisar (Ex: 1, 5000, 10000)" value="1">
+            <button onclick="realizarBusca()">Comparar Pesquisas</button>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">Carregando e comparando, aguarde...</div>
+
+        <table id="resultadoTabela">
+            <thead>
+                <tr>
+                    <th>Tipo de Pesquisa</th>
+                    <th>Tempo de Execução (ms)</th>
+                    <th>Resultado</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+
+        <h3>Detalhes do Registro Encontrado (ID: <span id="id-detalhe">N/A</span>)</h3>
+        <div class="detalhes">
+            <pre id="detalhe-registro">Use a chave 1, 5000 ou 10000 para ver o desempenho em diferentes posições da lista.</pre>
+        </div>
+    </div>
+
+    <script>
+        async function realizarBusca() {
+            const chave = document.getElementById('chaveBusca').value;
+            const tbody = document.querySelector('#resultadoTabela tbody');
+            const loading = document.getElementById('loading');
+            
+            // Limpa e mostra o loading
+            tbody.innerHTML = '';
+            document.getElementById('detalhe-registro').textContent = 'Aguardando resultados...';
+            document.getElementById('id-detalhe').textContent = '...';
+            loading.style.display = 'block';
+
+            if (!chave) {
+                alert("Por favor, digite uma chave de busca (ID).");
+                loading.style.display = 'none';
+                return;
+            }
+
+            try {
+                // Chama a API do Flask
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chave: chave })
+                });
+
+                const resultados = await response.json();
+                loading.style.display = 'none';
+
+                if (response.ok) {
+                    preencherTabela(resultados);
+                    
+                    const registro = resultados.hashmap.registro; // Usa Hashmap como fonte, pois é O(1)
+                    if (registro) {
+                        document.getElementById('detalhe-registro').textContent = JSON.stringify(registro, null, 2);
+                        document.getElementById('id-detalhe').textContent = registro.id;
+                    } else {
+                        document.getElementById('detalhe-registro').textContent = 'Nenhum registro encontrado com este ID.';
+                        document.getElementById('id-detalhe').textContent = chave + ' (Não Encontrado)';
+                    }
+                } else {
+                    alert(`Erro na busca: ${resultados.error || 'Erro desconhecido'}`);
+                }
+
+            } catch (error) {
+                loading.style.display = 'none';
+                alert('Erro ao conectar com o servidor. Verifique se o Flask está em execução: ' + error.message);
+            }
+        }
+
+        function preencherTabela(resultados) {
+            const tbody = document.querySelector('#resultadoTabela tbody');
+            tbody.innerHTML = '';
+
+            const tipos = {
+                sequencial: '1. Sequencial (O(n))',
+                indexada: '2. Indexada/Binária (O(log n))',
+                hashmap: '3. HashMap/Dicionário (O(1))'
+            };
+
+            for (const key in tipos) {
+                const resultado = resultados[key];
+                const row = tbody.insertRow();
+
+                row.insertCell().textContent = tipos[key];
+                row.insertCell().textContent = resultado.tempo;
+
+                const resultadoCell = row.insertCell();
+                if (resultado.registro) {
+                    resultadoCell.textContent = 'ENCONTRADO';
+                    resultadoCell.className = 'found';
+                } else {
+                    resultadoCell.textContent = 'NÃO ENCONTRADO';
+                    resultadoCell.className = 'not-found';
+                }
+            }
+        }
+    </script>
+</body>
+</html>
